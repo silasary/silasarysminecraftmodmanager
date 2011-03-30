@@ -45,96 +45,126 @@ namespace SilasarysMinecraftModManager
 
         static void Main(string[] args)
         {
-            if (Setup(args) == false)
-                return;
-            Updater.CheckForUpdates();
-            if (CheckMods() == false)
+            try
             {
-                Launch();
-                return;
-            }
-            String wd = wPath("wd");
-            String[] texmods = Directory.EnumerateFiles(wPath("TextureMods")).ToArray<String>();
-            if (texmods.Length > 0)
-            {
-                Console.WriteLine("Please select a texture Pack:");
-                Console.WriteLine("0 Minecraft Default");
-                for (int i = 0; i < texmods.Length; i++)
+
+                if (Setup(args) == false)
+                    return;
+                Updater.CheckForUpdates();
+                if (CheckMods() == false)
                 {
-                    Console.WriteLine(i+1 + " "+ texmods[i]);
+                    Launch();
+                    return;
                 }
-                char n = (char)Console.Read();
-                int s = int.Parse(n.ToString());
-                String tex = wPath("Original.jar");
-                if (s == 0)
+                String wd = wPath("wd");
+                String[] texmods = Directory.EnumerateFiles(wPath("TextureMods")).ToArray<String>();
+                if (texmods.Length > 0)
                 {
-                    Console.WriteLine("Loading Classic Texture Pack.");
-                    CopyAll(wPath("MinecraftJar"), wd,true);
+                    Console.WriteLine("Please select a texture Pack:");
+                    Console.WriteLine("0 Minecraft Default");
+                    for (int i = 0; i < texmods.Length; i++)
+                    {
+                        Console.WriteLine(i + 1 + " " + texmods[i]);
+                    }
+                    char n = (char)Console.Read();
+                    int s = int.Parse(n.ToString());
+                    String tex = wPath("Original.jar");
+                    if (s == 0)
+                    {
+                        Console.WriteLine("Loading Classic Texture Pack.");
+                        CopyAll(wPath("MinecraftJar"), wd, true);
+                    }
+                    else
+                    {
+                        tex = texmods[s - 1];
+                        Console.WriteLine("Loading " + Path.GetFileNameWithoutExtension(tex));
+                        String xPath = wPath("TextureMods", Path.GetFileNameWithoutExtension(tex));
+                        if (!Directory.Exists(xPath))
+                            f.ExtractZip(tex, xPath, "");
+                        CopyAll(xPath, wd, true);
+                    }
+
                 }
                 else
                 {
-                    tex = texmods[s - 1];
-                    Console.WriteLine("Loading " + Path.GetFileNameWithoutExtension(tex));
-                    String xPath = wPath("TextureMods",Path.GetFileNameWithoutExtension(tex));
-                    if (!Directory.Exists(xPath))
-                        f.ExtractZip(tex, xPath, "");
-                    CopyAll(xPath, wd,true);
+                    Console.WriteLine("Adding Base Minecraft Files");
+                    CopyAll(wPath("MinecraftJar"), wd, true);
                 }
+                fixNaughtyMods();
+                foreach (String Mod in Directory.EnumerateDirectories(wPath("mods")))
+                {
+                    Console.WriteLine("Applying " + Mod);
+                    if (Directory.EnumerateFiles(Mod, "*.java").Count() > 0)
+                    {
+                        Process javac = System.Diagnostics.Process.Start("javac", Path.Combine(Mod, "*.java") + " -cp \"" + wd + "\"");
+                        javac.WaitForExit();
+                    }
+                    CopyAll(Mod, wd, true);
+                }
+                CopyAuxData();
+                if (Directory.Exists(wPath("wd", "META-INF")))
+                    Directory.Delete(wPath("wd", "META-INF"), true);
+                Console.WriteLine("Creating jar.");
+                f.CreateZip("minecraft.jar", wd, true, "");
+                Console.WriteLine("Applying Jar.");
+                File.Copy("minecraft.jar", minecraftjar, true);
+                Directory.Delete(wPath("wd"), true);
 
+                StreamWriter VersionFile = new StreamWriter(mPath("bin", "mversion"));
+                VersionFile.WriteLine(patchVersion);
+                VersionFile.Close();
+
+                Launch();
+
+                examineConflicts();
+
+
+                // if (!File.Exists(wPath("Mods.7z")))
+                //   DownloadModsArchive(new String[] {"-q"});
             }
-            else
+            catch (Exception v)
             {
-                Console.WriteLine("Adding Base Minecraft Files");
-                CopyAll(wPath("MinecraftJar"), wd,true);
+                File.WriteAllText("error.log", v.ToString());
+                Process.Start("Notepad.exe", "error.log");
+                MessageBox.Show("Upload this to pastebin, and send the link to silasary");
+                SendToPastebin(v.ToString());
+
             }
-            fixNaughtyMods();
-            foreach (String Mod in Directory.EnumerateDirectories(wPath("mods")))
-            {
-                Console.WriteLine("Applying "+Mod);
-                CopyAll(Mod, wd,true);
-            }
-            CopyAuxData();
-            if (Directory.Exists(wPath("wd", "META-INF")))
-                Directory.Delete(wPath("wd", "META-INF"),true);
-            Console.WriteLine("Creating jar."); 
-            f.CreateZip("minecraft.jar", wd, true, "");
-            Console.WriteLine("Applying Jar.");
-            File.Copy("minecraft.jar", minecraftjar, true);
-            Directory.Delete(wPath("wd"), true);
-
-            StreamWriter VersionFile = new StreamWriter(mPath("bin", "mversion"));
-            VersionFile.WriteLine(patchVersion);
-            VersionFile.Close();
-
-            Launch();
-
-            examineConflicts();
-
-
-            if (!File.Exists(wPath("Mods.7z")))
-                DownloadModsArchive(new String[] {"-q"});
         }
 
         private static void fixNaughtyMods()
         {
             foreach (string mod in Directory.EnumerateDirectories(wPath("Mods")))
             {
-                if (Directory.EnumerateFiles(mod).Count() == 0 && Directory.EnumerateDirectories(mod).Count() == 1 && Directory.EnumerateDirectories(wPath("MinecraftJar")).Contains(Directory.EnumerateDirectories(mod).First()))
-                    Directory.Move(Directory.EnumerateDirectories(mod).First(), mod);
+                if (Directory.EnumerateFiles(mod).Count() == 0 && Directory.EnumerateDirectories(mod).Count() == 1 && Directory.EnumerateDirectories(wPath("MinecraftJar")).Contains(Directory.EnumerateDirectories(mod).First()) == false)
+                {//Directory.Move(Directory.EnumerateDirectories(mod).First(), mod);
+                    string f = Directory.EnumerateDirectories(mod).First();
+                    CopyAll(f, mod,true);
+                    Directory.Delete(f,true); // Can't count on it being First still.
+                }
                 bool naughty = false;
                 foreach (string folder in Directory.EnumerateDirectories(mod))
                 {
-                    if (folder.ToLowerInvariant().Contains("minecraft.jar"))
+                    try
                     {
-                        naughty = true;
-                        CopyAll(folder, mod,true);
-                        Directory.Delete(folder, true);
-                    }
-                    if (folder.ToLowerInvariant().Contains("resources") && folder.ToLowerInvariant() != Path.Combine(mod.ToLowerInvariant(),"resources"))
+                        if (folder.ToLowerInvariant().Contains("jar"))
+                        {
+                            naughty = true;
+                            CopyAll(folder, mod, true);
+                            Directory.Delete(folder, true);
+                        }
+                    else if (folder.ToLowerInvariant().Contains("resources") && folder.ToLowerInvariant() != Path.Combine(mod.ToLowerInvariant(), "resources"))
                     {
                         naughty = true;
                         Directory.Move(folder, Path.Combine(mod, "resources"));
                     }
+                    else if (folder.ToLowerInvariant().Contains(".minecraft") && folder.ToLowerInvariant() != Path.Combine(mod.ToLowerInvariant(), ".minecraft"))
+                        {
+                            naughty = true;
+                            Directory.Move(folder, Path.Combine(mod, ".minecraft"));
+                        }
+                    }
+                    catch (Exception v) { Console.WriteLine("Minor Error: " + v.ToString() + "\nYou probably don't need to worry about it."); }
                 }
                 if (naughty)
                     Console.WriteLine(mod + " was naughty.  Fixed.");
@@ -150,9 +180,31 @@ namespace SilasarysMinecraftModManager
             }
             if (File.Exists(wPath("wd", "BiomeTerrainModSettings.ini")) && !File.Exists(mPath("BiomeTerrainModSettings.ini")))
             {
-                Console.WriteLine("Copying default BiomeTerrainModSettings.");
+                Console.WriteLine("Found default BiomeTerrainModSettings.");
                 File.Copy(wPath("wd", "BiomeTerrainModSettings.ini"), mPath("BiomeTerrainModSettings.ini"));
             }
+            if (File.Exists(wPath("wd", "HumansPlus.properties")) && !File.Exists(mPath("HumansPlus.properties")))
+            {
+                Console.WriteLine("Found default HumansPlus.properties.");
+                File.Copy(wPath("wd", "HumansPlus.properties"), mPath("HumansPlus.properties"));
+            }
+            if (Directory.Exists(wPath("wd",".minecraft")))
+            {
+                CopyAll(wPath("wd", ".minecraft"), mPath(), false);
+            }
+            String dest;
+            foreach (string jar in Directory.EnumerateFiles(wPath("wd"), "*.jar"))
+            {
+                if (!File.Exists(dest = mPath("bin", Path.GetFileName(jar))))
+                    File.Copy(jar, dest);
+            }
+            //foreach (string jad in Directory.EnumerateFiles(wPath("wd"), "*.jad"))
+            //{
+            //    System.Console.WriteLine("javac " + jad);
+            //    Process javac = System.Diagnostics.Process.Start("javac.exe", jad);
+            //    //Console.WriteLine( javac.StandardOutput.ReadToEnd());
+            //    javac.WaitForExit();
+            //}
         }
 
         private static void examineConflicts()
@@ -192,6 +244,8 @@ namespace SilasarysMinecraftModManager
                 Process.Start(wPath("MinecraftPortable.exe"));
             else if (File.Exists("Minecraft.exe"))
                 Process.Start("Java.exe", "-Xmx1024M -Xms512M -jar Minecraft.exe");
+            else
+                DownloadMinecraftExe();
         }
 
         private static bool CheckMods()
@@ -214,6 +268,13 @@ namespace SilasarysMinecraftModManager
 
         private static bool Setup(string[] args)
         {
+            //if (Application.StartupPath.Contains("temp"))
+            //{
+            //    MessageBox.Show("Don't run this from inside the zip file!");
+            //    //File.Copy(Application.ExecutablePath, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Minecraft Mod Manager"));
+            //    //Process.Start(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Minecraft Mod Manager"));
+            //    return false;
+            //}
             if (args.Length > 1)
             {
                 if (args[0] == "-b")
@@ -254,6 +315,12 @@ namespace SilasarysMinecraftModManager
             else
             {
                 //Console.WriteLine("You may want to create a version.txt");
+                DownloadVersionTxt(mcVersion, wPath("version.txt"));
+                if (File.Exists(wPath("version.txt")))
+                {
+                    VersionFile = new StreamReader(wPath("version.txt"));
+                    mcVersion = VersionFile.ReadLine();
+                }
             }
             Console.WriteLine("Current Version:  " + mcVersion);
 
