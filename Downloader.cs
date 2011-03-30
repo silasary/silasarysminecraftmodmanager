@@ -5,6 +5,8 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Net;
 using System.IO;
+using System.Diagnostics;
+using System.Web;
 
 namespace SilasarysMinecraftModManager
 {
@@ -66,5 +68,91 @@ namespace SilasarysMinecraftModManager
             }
             return Out;
         }
+
+        public static void DownloadVersionTxt(string i,string versionfile)
+        {
+            try
+            {
+                WebClient wc = new WebClient();
+                Directory.CreateDirectory(Path.GetDirectoryName(versionfile));
+                wc.DownloadFile("http://dl.dropbox.com/u/4187827/Minecraft/versions/" + i, versionfile);
+            }
+            catch (Exception)
+            { }
+        }
+
+        public static void DownloadMinecraftExe()
+        {
+            try
+            {
+                WebClient wc = new WebClient();
+                wc.DownloadFile("http://www.minecraft.net/download/Minecraft.exe?v=1301446270071", "minecraft.exe");
+                Process.Start("Java.exe", "-Xmx1024M -Xms512M -jar Minecraft.exe");
+            }
+            catch (Exception e)
+            { }
+        }
+
+        private static void SendToPastebin(string text)
+        {
+            /// Method 1
+
+            //string name = "Error Report: SMMM";
+            //string email = String.Empty;
+            //string hl = "csharp";
+            //string expire = String.Empty;
+            //string subdomain = "Silasary";
+            //string privacy = String.Empty;
+            //string data = String.Format("&paste_name={0}&paste_email={1}&paste_format={2}&paste_expire_date={3}&paste_subdomain={4}&paste_private={5}&paste_code={6}", HttpUtility.UrlEncode(name), HttpUtility.UrlEncode(email), HttpUtility.UrlEncode(hl), HttpUtility.UrlEncode(expire), HttpUtility.UrlEncode(subdomain), HttpUtility.UrlEncode(privacy), HttpUtility.UrlEncode(text));
+            //WebClient pasteClient = new WebClient();
+            //Uri uri = new Uri("http://www.pastebin.com/api_public.php");
+
+            //pasteClient.Headers.Add("Content-Type", "application/x-www-form-urlencoded");
+            //pasteClient.UploadString(uri, data);
+
+            /// Method 2
+            
+            //try
+            //{
+
+            //    HttpWebRequest request = (HttpWebRequest)
+            //        WebRequest.Create("http://davux.pastebin.com/pastebin.php");
+
+            //    request.AllowAutoRedirect = false;
+            //    request.Method = "POST";
+
+            //    string post = "&amp;parent_pid=&amp;format=text&amp;code2=" + HttpUtility.UrlEncode(text) + "&amp;poster=Dave&amp;paste=Send&amp;expiry=m&amp;email=";
+            //    byte[] data = System.Text.Encoding.ASCII.GetBytes(post);
+
+            //    request.ContentType = "application/x-www-form-urlencoded";
+            //    request.ContentLength = data.Length;
+
+            //    Stream response = request.GetRequestStream();
+
+            //    response.Write(data, 0, data.Length);
+
+            //    response.Close();
+
+            //    HttpWebResponse res = (HttpWebResponse)request.GetResponse();
+            //    res.Close();
+            //    // note that there is no need to hook up a StreamReader and
+            //    // look at the response data, since it is of no need
+
+            //    if (res.StatusCode == HttpStatusCode.Found)
+            //    {
+            //        Console.WriteLine(res.Headers["location"]);
+            //    }
+            //    else
+            //    {
+            //        Console.WriteLine("Error");
+            //    }
+
+            //}
+            //catch (Exception ex)
+            //{
+            //    Console.WriteLine("Error: " + ex.Message);
+            //}
+        }
+
     }
 }
